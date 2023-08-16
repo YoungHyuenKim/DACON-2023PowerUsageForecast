@@ -128,7 +128,7 @@ CLUSTER = {0: [100,
            3: [10, 13, 14, 15]}
 
 # length of training data for prediction (5 weeks)
-ENCODER_LENGTH_IN_WEEKS = 5
+ENCODER_LENGTH_IN_WEEKS = 2
 device = "gpu"
 
 # learning rate determined by a cv run with train data less 1 trailing week as validation
@@ -158,14 +158,14 @@ START_SEED = 43
 NUM_SEEDS = 5
 TOP_K = int(max(NUM_SEEDS * 1.5, 10))
 BATCH_SIZE = 128
-NUM_WORKERS = 12
+NUM_WORKERS = 0
 
 # hyper parameters determined by cv runs with train data less 1 trailing week as validation
 PARAMS = {
     'gradient_clip_val': 0.8733187217928037,
     'hidden_size': 256,
     'dropout': 0.12544263168386235,
-    'hidden_continuous_size': 90,
+    'hidden_continuous_size': 92,
     'attention_head_size': 4,
     'learning_rate': 0.08
 }
@@ -175,7 +175,7 @@ parser.add_argument('--seed', '-s', nargs='+', type=int, default=list(range(STAR
 # parser.add_argument('--val', default=False, action='store_true')
 # parser.add_argument('--nepochs', '-e', type=int, default=NUM_EPOCHS)
 parser.add_argument('--gpu', type=int, default=0)
-parser.add_argument('--fit', default=True, action='store_true')
+parser.add_argument('--fit', default=False, action='store_true')
 parser.add_argument('--forecast', default=True, action='store_true')
 parser.add_argument('--dataroot', '-d', type=str, default="../Data/rawData")
 args = parser.parse_args()
@@ -549,7 +549,7 @@ def forecast(ckpt, train_df, test_df):
     max_encoder_length = best_tft.dataset_parameters['max_encoder_length']
     max_prediction_length = best_tft.dataset_parameters['max_prediction_length']
 
-    assert max_encoder_length == 5 * 24 * 7 and max_prediction_length == 1 * 24 * 7
+    assert max_encoder_length == ENCODER_LENGTH_IN_WEEKS * 24 * 7 and max_prediction_length == 1 * 24 * 7
 
     # use 5 weeks of training data at the end
     encoder_data = train_df[lambda x: x.time_idx > x.time_idx.max() - max_encoder_length]
