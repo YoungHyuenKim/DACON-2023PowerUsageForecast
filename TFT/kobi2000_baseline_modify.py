@@ -151,12 +151,12 @@ LRS = [0.05099279397234306, 0.05099279397234306, 0.05099279397234306, 0.05099279
        0.0005099279397234307, 0.0005099279397234307, 0.0005099279397234307]
 
 # number of epochs found in cv run
-NUM_EPOCHS = 60
+NUM_EPOCHS = 120
 
 # number of seeds to use
 START_SEED = 43
-NUM_SEEDS = 5
-TOP_K = int(max(NUM_SEEDS * 1.5, 10))
+NUM_SEEDS = 10
+TOP_K = 10
 BATCH_SIZE = 128
 NUM_WORKERS = 0
 
@@ -176,12 +176,12 @@ parser.add_argument('--seed', '-s', nargs='+', type=int, default=list(range(STAR
 # parser.add_argument('--nepochs', '-e', type=int, default=NUM_EPOCHS)
 parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--fit', default=False, action='store_true')
-parser.add_argument('--forecast', default=True, action='store_true')
+parser.add_argument('--forecast', default=False, action='store_true')
 parser.add_argument('--dataroot', '-d', type=str, default="../Data/rawData")
 args = parser.parse_args()
 args.val = False
 args.nepochs = NUM_EPOCHS
-print(args)
+# print(args)
 
 DATAROOT = Path(args.dataroot)  # 코드에 ‘/data’ 데이터 입/출력 경로 포함
 CKPTROOT = DATAROOT / "ckpts"  # directory for model checkpoints
@@ -311,6 +311,7 @@ def __read_df():
 
 
 # add aggregate(mean) target feature for 'cluster', 'building', 'mgrp' per date
+# TODO:: Avoid Data Leaking
 def add_feats(df):
     df.reset_index(drop=True, inplace=True)
 
@@ -341,6 +342,10 @@ def add_feats(df):
         col_mapper = {c: f"{s}_{c}" for c in cols}
         tr = g[cols].transform(s).rename(col_mapper, axis=1)
         df = pd.concat([df, tr], axis=1)
+
+    # Discomfort index
+    tr = (0.81 * df["temperature"] + 0.01 * df["humidity"] + 46.3).rename("Discomfort_index")
+    df = pd.concat([df, tr], axis=1)
 
     return df
 
@@ -429,9 +434,14 @@ def load_dataset(train_df, validate=False):
             "time_idx",
             'hour',
             "temperature",
+            "rainfall",
             "windspeed",
             "humidity",
-            'cumhol'
+            'cumhol',
+            'total_area',
+            "ess_capacity",
+            "pcs_capacity",
+            "Discomfort_index"
         ],
         target_normalizer=GroupNormalizer(groups=["building_number"], transformation="softplus"),
         time_varying_unknown_categoricals=[],
@@ -447,7 +457,6 @@ def load_dataset(train_df, validate=False):
         add_target_scales=True,  # add as feature
         add_encoder_length=True,  # add as feature
     )
-
     va_ds = None
     if validate:
         # validation dataset not used for submission
@@ -459,7 +468,7 @@ def load_dataset(train_df, validate=False):
 
 
 # training
-def fit(seed, tr_ds, va_loader=None):
+def fit(seed, tr_ds, va_loader=None, find_check_points=False):
     seed_all(seed)  # doesn't really work as training is non-deterministic
 
     # create dataloaders for model
@@ -528,7 +537,16 @@ def fit(seed, tr_ds, va_loader=None):
     kwargs = {'train_dataloaders': tr_loader}
     if va_loader:
         kwargs['val_dataloaders'] = va_loader
-
+    if find_check_points:
+        seed_check_points = CKPTROOT.glob(f"0816_epoch_60/seed={seed}-*.ckpt")
+        min_loss = 10000000000
+        kwargs["ckpt_path"] = None
+        for check_point in seed_check_points:
+            loss = float(check_point.name.split("=")[-1][:-5])
+            if loss < min_loss:
+                min_loss = loss
+                kwargs["ckpt_path"] = check_point
+        print(f"Fit : ckpt_path", kwargs["ckpt_path"])
     # fit network
     trainer.fit(
         tft,
@@ -727,7 +745,7 @@ if __name__ == "__main__":
         if args.fit:
             print("### FIT ###")
             for s in args.seed:
-                fit(s, tr_ds, va_ds)
+                fit(s, tr_ds, va_ds, find_check_points=False)
 
         if args.forecast:
             print("### FORECAST ###")
