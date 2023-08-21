@@ -158,7 +158,7 @@ START_SEED = 43
 NUM_SEEDS = 10
 TOP_K = 10
 BATCH_SIZE = 128
-NUM_WORKERS = 0
+NUM_WORKERS = 12
 
 # hyper parameters determined by cv runs with train data less 1 trailing week as validation
 PARAMS = {
@@ -175,8 +175,8 @@ parser.add_argument('--seed', '-s', nargs='+', type=int, default=list(range(STAR
 # parser.add_argument('--val', default=False, action='store_true')
 # parser.add_argument('--nepochs', '-e', type=int, default=NUM_EPOCHS)
 parser.add_argument('--gpu', type=int, default=0)
-parser.add_argument('--fit', default=False, action='store_true')
-parser.add_argument('--forecast', default=False, action='store_true')
+parser.add_argument('--fit', default=True, action='store_true')
+parser.add_argument('--forecast', default=True, action='store_true')
 parser.add_argument('--dataroot', '-d', type=str, default="../Data/rawData")
 args = parser.parse_args()
 args.val = False
